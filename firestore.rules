@@ -1,0 +1,119 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: tickets
+    // Document ID: ticketId
+    // Fields:
+    //   - id: string (required) - Unique ticket ID
+    //   - customerId: string (required) - ID of the customer
+    //   - email: string (optional, email format) - Customer email
+    //   - subject: string (required) - Ticket subject
+    //   - status: string (required, enum: Open, In Progress, Resolved, Closed)
+    //   - priority: string (required, enum: Low, Medium, High, Urgent)
+    //   - createdAt: string (required, ISO 8601)
+    //   - lastUpdate: string (required)
+    //
+    // Collection: emails
+    // Document ID: emailId
+    // Fields:
+    //   - id: string (required) - Unique email ID
+    //   - ticketId: string (required) - Related ticket ID
+    //   - customerId: string (required) - Recipient customer ID
+    //   - to: string (required, email format) - Recipient email
+    //   - subject: string (required) - Email subject
+    //   - body: string (required) - Email HTML body
+    //   - sentAt: string (required, ISO 8601)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "dharineeshvengatesan@gmail.com"));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[^@]+@[^@]+$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /tickets/{ticketId} {
+      function isValidTicket(data) {
+        return data.keys().hasAll(['id', 'customerId', 'subject', 'status', 'priority', 'createdAt']) &&
+               data.id is string && data.id.size() > 0 && data.id.size() < 50 &&
+               data.customerId is string && data.customerId.size() > 0 && data.customerId.size() < 50 &&
+               data.subject is string && data.subject.size() > 0 && data.subject.size() < 200 &&
+               data.status in ['Open', 'In Progress', 'Resolved', 'Closed'] &&
+               data.priority in ['Low', 'Medium', 'High', 'Urgent'] &&
+               isValidDateString(data.createdAt) &&
+               (!('email' in data) || isValidEmail(data.email));
+      }
+
+      // Allow read/create for demo purposes, but restrict updates to admins
+      allow read: if true; 
+      allow create: if true;
+      allow update: if isAdmin() && isValidTicket(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /emails/{emailId} {
+      function isValidEmailDoc(data) {
+        return data.keys().hasAll(['ticketId', 'customerId', 'to', 'subject', 'body', 'sentAt']) &&
+               data.ticketId is string && data.ticketId.size() > 0 &&
+               data.customerId is string && data.customerId.size() > 0 &&
+               isValidEmail(data.to) &&
+               data.subject is string && data.subject.size() > 0 &&
+               data.body is string && data.body.size() > 0 && data.body.size() < 1000000 &&
+               isValidDateString(data.sentAt) &&
+               (!('status' in data) || data.status is string) &&
+               (!('error' in data) || data.error is string);
+      }
+
+      // Allow read/create for demo purposes
+      allow read: if true;
+      allow create: if true;
+      allow update: if false; // Email history should be immutable
+      allow delete: if isAdmin();
+    }
+
+    match /knowledge_base/{docId} {
+      function isValidKnowledgeDoc(data) {
+        return data.keys().hasAll(['title', 'content', 'source', 'category', 'embedding']) &&
+               data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+               data.content is string && data.content.size() > 0 && data.content.size() < 1000000 &&
+               data.source is string && data.source.size() > 0 && data.source.size() < 200 &&
+               data.category in ['SOP', 'Documentation', 'Ticket', 'Wiki'] &&
+               data.embedding is list && data.embedding.size() > 0;
+      }
+
+      allow read: if true;
+      allow create: if true; // Allow seeding for demo purposes
+      allow update: if isAdmin() && isValidKnowledgeDoc(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if request.auth.uid == userId || isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}

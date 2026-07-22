@@ -1,0 +1,47 @@
+{
+  "entities": {
+    "Ticket": {
+      "title": "Ticket",
+      "description": "A support ticket raised by a customer.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique ticket ID." },
+        "customerId": { "type": "string", "description": "ID of the customer who raised the ticket." },
+        "email": { "type": "string", "format": "email", "description": "Customer's email address." },
+        "subject": { "type": "string", "description": "Subject of the ticket." },
+        "status": { "type": "string", "enum": ["Open", "In Progress", "Resolved", "Closed"], "description": "Current status of the ticket." },
+        "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Urgent"], "description": "Priority level of the ticket." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the ticket was created." },
+        "lastUpdate": { "type": "string", "description": "Relative time of the last update." }
+      },
+      "required": ["id", "customerId", "subject", "status", "priority", "createdAt"]
+    },
+    "Email": {
+      "title": "Email",
+      "description": "An email sent to a customer regarding a ticket.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique email ID." },
+        "ticketId": { "type": "string", "description": "ID of the ticket this email is related to." },
+        "customerId": { "type": "string", "description": "ID of the customer this email was sent to." },
+        "to": { "type": "string", "format": "email", "description": "Recipient email address." },
+        "subject": { "type": "string", "description": "Subject of the email." },
+        "body": { "type": "string", "description": "HTML content of the email." },
+        "sentAt": { "type": "string", "format": "date-time", "description": "When the email was sent." },
+        "status": { "type": "string", "enum": ["sent", "failed", "simulated"], "description": "The status of the email send." },
+        "error": { "type": "string", "description": "Error message if the email failed to send." }
+      },
+      "required": ["id", "ticketId", "customerId", "to", "subject", "body", "sentAt"]
+    }
+  },
+  "firestore": {
+    "/tickets/{ticketId}": {
+      "schema": "Ticket",
+      "description": "Collection of support tickets."
+    },
+    "/emails/{emailId}": {
+      "schema": "Email",
+      "description": "Collection of sent emails history."
+    }
+  }
+}
